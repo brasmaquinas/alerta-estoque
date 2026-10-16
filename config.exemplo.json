@@ -1,0 +1,25 @@
+{
+  "sankhya": {
+    "baseUrl": "https://api.sankhya.com.br",
+    "autenticacao": "oauth",
+    "token": "TOKEN-DO-API-GATEWAY",
+    "clientId": "CLIENT-ID",
+    "clientSecret": "CLIENT-SECRET",
+    "appkey": "",
+    "usuario": "",
+    "senha": ""
+  },
+  "resend": {
+    "apiKey": "re_xxxxxxxxxxxxxxxxxxxxxxxx",
+    "remetente": "Monitor de Estoque <ti.gbi@brasmaquinas.com.br>",
+    "responderPara": "ti.gbi@brasmaquinas.com.br"
+  },
+  "regra": {
+    "empresasParticipantes": [],
+    "somenteEstoqueProprio": true,
+    "faixaAtencaoPct": 20
+  },
+  "campoDescricaoGrupo": "DESCRICAO",
+  "fusoHorario": "America/Sao_Paulo",
+  "assunto": "[ALERTA SANKHYA]: Estoque Crítico de Módulos Solares"
+}
