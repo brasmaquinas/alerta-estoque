@@ -482,9 +482,14 @@ async function executar(opcoes, deps) {
     }
 
     if (opcoes.teste) {
-      const arq = path.join(path.dirname(opcoes.config || __filename), "previa-email.html");
-      fs.writeFileSync(arq, previas.length ? previas.map((p) => "<h3 style=\"font-family:sans-serif\">" + esc(p.assunto) + "</h3>" + p.html).join("<hr>") : "<p>Nenhum grupo crítico agora.</p>");
-      log("Modo teste: nada foi enviado nem gravado. Prévia em " + arq);
+      const conteudo = previas.length ? previas.map((p) => "<h3 style=\"font-family:sans-serif\">" + esc(p.assunto) + "</h3>" + p.html).join("<hr>") : "<p>Nenhum grupo crítico agora.</p>";
+      // No container a pasta do app é somente leitura: tenta ao lado do config e depois na pasta temporária.
+      const pastas = [path.dirname(opcoes.config || __filename), require("os").tmpdir()];
+      let arq = null;
+      for (const p of pastas) {
+        try { fs.writeFileSync(path.join(p, "previa-email.html"), conteudo); arq = path.join(p, "previa-email.html"); break; } catch (e) { /* tenta a próxima */ }
+      }
+      log("Modo teste: nada foi enviado nem gravado. " + (arq ? "Prévia em " + arq : "Não foi possível gravar a prévia do e-mail."));
     }
   } finally {
     await sk.sair();
