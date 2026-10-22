@@ -63,7 +63,7 @@ AGENDA_DIAS=1,2,3,4,5,6
 ```
 
    - **Login antigo do Gateway:** acrescente `SANKHYA_AUTENTICACAO=legado`, `SANKHYA_APPKEY`, `SANKHYA_USUARIO` e `SANKHYA_SENHA`, no lugar do client id/secret.
-   - **Regra de cálculo:** só precisa mudar se a tela não estiver no padrão. Use `EMPRESAS_PARTICIPANTES=1,2`, `SOMENTE_ESTOQUE_PROPRIO=N` e `FAIXA_ATENCAO_PCT=20`, iguais ao `config.js` da tela.
+   - **Regra de cálculo:** só precisa mudar se a tela não estiver no padrão. Use `EMPRESAS_PARTICIPANTES=1,2`, `SOMENTE_ESTOQUE_PROPRIO=N`, `FAIXA_ATENCAO_PCT=20` e `EXCLUIR_LOCAIS_COM_NOME=PROJETO`, iguais ao `config.js` da tela.
 
 5. **Implantar:** clique em **Implantar**. Na aba **Logs** deve aparecer `Serviço iniciado. Horários: 7, 9, 11...`. Se faltar alguma variável, o log diz qual.
 6. **Testar:** pela aba **Console** do serviço:
@@ -135,4 +135,6 @@ Use o Agendador de Tarefas com uma tarefa que roda a cada 2 horas:
 
 ## Configuração da regra
 
-O bloco `regra` do `config.json` (`empresasParticipantes`, `somenteEstoqueProprio`, `faixaAtencaoPct`) deve ficar **igual ao `config.js` da tela**, para o e-mail e a tela mostrarem o mesmo número.
+O bloco `regra` do `config.json` (`empresasParticipantes`, `somenteEstoqueProprio`, `faixaAtencaoPct`, `excluirLocaisComNome`) deve ficar **igual ao `config.js` da tela**, para o e-mail e a tela mostrarem o mesmo número.
+
+**Locais de projeto:** por padrão, todo local cujo nome contém "PROJETO" fica fora do disponível. A comparação ignora maiúsculas e acentos. Para mudar ou desligar, use `EXCLUIR_LOCAIS_COM_NOME` (termos separados por vírgula; vazio = desligado). Se a leitura dos nomes dos locais (TGFLOC) falhar, a execução para sem enviar e-mail, para não alertar com número errado.

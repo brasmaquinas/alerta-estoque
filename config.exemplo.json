@@ -17,7 +17,8 @@
   "regra": {
     "empresasParticipantes": [],
     "somenteEstoqueProprio": true,
-    "faixaAtencaoPct": 20
+    "faixaAtencaoPct": 20,
+    "excluirLocaisComNome": ["PROJETO"]
   },
   "campoDescricaoGrupo": "DESCRICAO",
   "fusoHorario": "America/Sao_Paulo",

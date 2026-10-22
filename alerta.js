@@ -56,6 +56,7 @@ function carregarConfig(arquivo) {
   if (env.EMPRESAS_PARTICIPANTES !== undefined) c.regra.empresasParticipantes = lista(env.EMPRESAS_PARTICIPANTES);
   if (env.SOMENTE_ESTOQUE_PROPRIO) c.regra.somenteEstoqueProprio = env.SOMENTE_ESTOQUE_PROPRIO.toUpperCase() !== "N";
   if (env.FAIXA_ATENCAO_PCT) c.regra.faixaAtencaoPct = Number(env.FAIXA_ATENCAO_PCT);
+  if (env.EXCLUIR_LOCAIS_COM_NOME !== undefined) c.regra.excluirLocaisComNome = String(env.EXCLUIR_LOCAIS_COM_NOME).split(",").map((x) => x.trim()).filter(Boolean);
   if (env.CAMPO_DESCRICAO_GRUPO) c.campoDescricaoGrupo = env.CAMPO_DESCRICAO_GRUPO;
   if (env.ASSUNTO) c.assunto = env.ASSUNTO;
   c.agendaHoras = env.AGENDA_HORAS ? lista(env.AGENDA_HORAS) : c.agendaHoras || [7, 9, 11, 13, 15, 17, 19];
@@ -69,7 +70,7 @@ function carregarConfig(arquivo) {
   if (env.RESEND_API_KEY) c.resend.apiKey = env.RESEND_API_KEY;
   c.sankhya.baseUrl = (c.sankhya.baseUrl || "https://api.sankhya.com.br").replace(/\/$/, "");
   c.sankhya.autenticacao = c.sankhya.autenticacao || "oauth";
-  c.regra = Object.assign({ empresasParticipantes: [], somenteEstoqueProprio: true, faixaAtencaoPct: 20 }, c.regra || {});
+  c.regra = Object.assign({ empresasParticipantes: [], somenteEstoqueProprio: true, faixaAtencaoPct: 20, excluirLocaisComNome: ["PROJETO"] }, c.regra || {});
   c.campoDescricaoGrupo = c.campoDescricaoGrupo || "DESCRICAO";
   c.fusoHorario = c.fusoHorario || "America/Sao_Paulo";
   c.assunto = c.assunto || "[ALERTA SANKHYA]: Estoque Crítico de Módulos Solares";
@@ -257,7 +258,7 @@ async function carregarDados(sk, cfg) {
     produtos: produtos.map((p) => ({ grupoId: num(p.GRUPOID), codProd: num(p.CODPROD), ativo: flag(p.ATIVO) })),
     destinatarios: destinatarios.map((d) => ({ grupoId: num(d.GRUPOID), nome: (d.NOME || "").trim(), email: (d.EMAIL || "").trim(), ativo: flag(d.ATIVO) })),
     locaisExcluidos: locais.map((l) => ({ codLocal: num(l.CODLOCAL), codEmp: num(l.CODEMP), descricao: (l.MOTIVO || "").trim(), ativo: flag(l.ATIVO) })),
-    catalogo: {}, empresas: {}, estoque: []
+    catalogo: {}, empresas: {}, estoque: [], nomesLocais: {}
   };
   const cods = [...new Set(D.produtos.filter((p) => p.ativo && p.codProd !== null).map((p) => p.codProd))];
   if (cods.length) {
@@ -269,14 +270,31 @@ async function carregarDados(sk, cfg) {
     cat.forEach((p) => { D.catalogo[num(p.CODPROD)] = { descricao: (p.DESCRPROD || "").trim(), unidade: (p.CODVOL || "").trim() }; });
     emp.forEach((e) => { D.empresas[num(e.CODEMP)] = (e.NOMEFANTASIA || "").trim(); });
     D.estoque = est.map((r) => ({ codEmp: num(r.CODEMP), codProd: num(r.CODPROD), codLocal: num(r.CODLOCAL), tipo: (r.TIPO || "").trim(), estoque: num(r.ESTOQUE) || 0, reservado: num(r.RESERVADO) || 0 }));
+
+    // Nomes dos locais usados (TGFLOC), para a regra "excluir locais com nome ...".
+    // Se a leitura falhar, a execução falha: melhor não enviar do que enviar número errado.
+    if ((cfg.regra.excluirLocaisComNome || []).length) {
+      const locs = [...new Set(D.estoque.map((r) => r.codLocal).filter((c) => c !== null))];
+      const nomes = locs.length ? await consultarEmLotes(sk, "LocalFinanceiro", ["CODLOCAL", "DESCRLOCAL"], "CODLOCAL", locs) : [];
+      nomes.forEach((l) => { D.nomesLocais[num(l.CODLOCAL)] = (l.DESCRLOCAL || "").trim(); });
+    }
   }
   return D;
+}
+
+const normalizar = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+/** Local cujo nome contém um dos termos (ex.: PROJETO), sem diferenciar acento e maiúsculas. */
+function localExcluidoPeloNome(nome, regra) {
+  const n = normalizar(nome);
+  return !!n && (regra.excluirLocaisComNome || []).some((t) => n.indexOf(normalizar(t)) >= 0);
 }
 
 function linhaConsiderada(r, D, regra) {
   if (regra.somenteEstoqueProprio !== false && r.tipo.toUpperCase() !== "P") return false;
   const part = regra.empresasParticipantes || [];
   if (part.length && part.map(Number).indexOf(r.codEmp) < 0) return false;
+  if (localExcluidoPeloNome(D.nomesLocais[r.codLocal], regra)) return false;
   return !D.locaisExcluidos.some((l) => l.ativo && l.codLocal === r.codLocal && (l.codEmp === null || l.codEmp === r.codEmp));
 }
 
@@ -360,7 +378,7 @@ function montarEmail(r, agora, cfg) {
     linhas +
     "<tr><td " + td + ' colspan="2"><strong>Total</strong></td><td ' + tdn + "><strong>" + qtd(r.fisico) + "</strong></td><td " + tdn + "><strong>" + qtd(r.reservado) +
     "</strong></td><td " + tdn + "><strong>" + qtd(r.disponivel) + "</strong></td></tr></table>" +
-    '<p style="margin:18px 0 0;font-size:12px;color:#5f6f69;line-height:1.5">Disponível = estoque físico − reservado (TGFEST), somente estoque próprio e sem os locais excluídos. ' +
+    '<p style="margin:18px 0 0;font-size:12px;color:#5f6f69;line-height:1.5">Disponível = estoque físico − reservado (TGFEST), somente estoque próprio, sem os locais excluídos e sem locais de projeto. ' +
     "Verificado em " + esc(quando) + ". Enquanto o grupo continuar crítico, este aviso será repetido uma vez por dia.</p>" +
     "</td></tr></table></body></html>";
 
@@ -481,7 +499,7 @@ async function gravarResultado(sk, idLog, base, valores) {
   else await sk.salvar("AD_ALERLOG", v, null);
 }
 
-module.exports = { executar, calcularGrupo, carregarConfig, destinatariosDoGrupo, montarEmail, dataChave, momento };
+module.exports = { executar, calcularGrupo, localExcluidoPeloNome, carregarConfig, destinatariosDoGrupo, montarEmail, dataChave, momento };
 
 /** Hora e dia da semana no fuso configurado. */
 function momento(agora, fuso) {
